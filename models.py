@@ -1,6 +1,8 @@
-from sqlalchemy import  Column, Integer, String, VARCHAR, DECIMAL, TIMESTAMP
+from sqlalchemy import  Column, Integer, String, VARCHAR, DECIMAL, TIMESTAMP, ForeignKey, DateTime, Boolean
 from database import Base
 from sqlalchemy.sql import func
+from datetime import datetime
+from sqlalchemy.orm import relationship
 
 class Users(Base):
 
@@ -21,5 +23,8 @@ class PIMS(Base):
     stock = Column(Integer, default=0)
     category  = Column(VARCHAR(100))             
     image_url =  Column(VARCHAR(255))
+    is_sold= Column(Boolean, default=False)
     created_at =  Column(TIMESTAMP, default=func.now())
     updated_at = Column(TIMESTAMP, default=func.now(), onupdate=func.now())
+
+
