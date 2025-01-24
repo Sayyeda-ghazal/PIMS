@@ -1,5 +1,6 @@
 from pydantic import BaseModel, EmailStr
 from typing import Optional
+from enum import Enum
 
 class Users(BaseModel):
 
@@ -31,7 +32,8 @@ class pims(BaseModel):
     image_url :  Optional[str] = None
     created_at :  Optional[str] = None
     updated_at : Optional[str] = None
-    class config:
+    is_sold: bool
+    class Config:
         form_attribute = True
 
 
@@ -43,3 +45,24 @@ class reset_password(BaseModel):
 
 class PasswordResetRequest(BaseModel):
     email: str
+
+class NewPassword(BaseModel):
+    new_password: str
+
+class SaleSchema(BaseModel):
+    name: str
+    stock: int
+    email : EmailStr
+
+class filter_products(BaseModel):
+    min_price: Optional[float]
+    max_price: Optional[float]
+    min_stock: Optional[int] 
+    max_stock: Optional[int] 
+
+class StockStatusEnum(Enum):
+    available = "Available"
+    sold = "Sold"
+
+
+
