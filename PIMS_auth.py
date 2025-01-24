@@ -4,12 +4,15 @@ from database import get_db
 import models, schemas
 from schemas import pims
 from starlette import status
+from send_mail import send_email
+from authentication import user_access
+from models import Users
 
 router = APIRouter(prefix='/pims_auth', tags=['auth'])
 
 
 @router.get("/viewproducts/")
-def viewproduct(session: Session=Depends(get_db)):
+def viewproduct(session: Session=Depends(get_db),current_user: Users = Depends(user_access)):
 
     product = session.query(models.PIMS).all()
 
@@ -20,7 +23,8 @@ def viewproduct(session: Session=Depends(get_db)):
 
 @router.post("/addproducts/")
 def addproduct(item: schemas.pims,
-               session: Session=Depends(get_db)):
+               session: Session=Depends(get_db),
+               current_user: Users = Depends(user_access)):
 
     product = session.query(models.PIMS).filter(models.PIMS.name == item.name and
                                                 models.PIMS.category == item.category and
@@ -45,7 +49,8 @@ def addproduct(item: schemas.pims,
 @router.put("/updateproducts/{product_id}")
 def updateproducts(product_id:int,
                    item: schemas.pims,
-                   session: Session=Depends(get_db)
+                   session: Session=Depends(get_db),
+                   current_user: Users = Depends(user_access)
                   ):
     product = session.query(models.PIMS).get(product_id)
 
@@ -67,10 +72,13 @@ def updateproducts(product_id:int,
 
     session.commit()
     session.refresh(product)
+    
+    return {"message": "product has been added successfully."}
 
 @router.delete("/deleteproducts/{product_id}")
 def deleteproducts(product_id:int,
-                   session: Session=Depends(get_db)):
+                   session: Session=Depends(get_db),
+                   current_user: Users = Depends(user_access)):
    product = session.query(models.PIMS).get(product_id)
    
    if not product:
@@ -80,3 +88,4 @@ def deleteproducts(product_id:int,
    session.commit()
    session.close()
    return {f"Product {product_id} was deleted."}
+
