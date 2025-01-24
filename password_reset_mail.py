@@ -8,7 +8,7 @@ from typing import Any
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-SCOPES = os.getenv("SCOPES")
+SCOPES = ['https://www.googleapis.com/auth/gmail.send']
 CREDENTIALS_FILE = os.getenv("CREDENTIALS_FILE")
 TOKEN_FILE = os.getenv("TOKEN_FILE")
 
@@ -34,15 +34,14 @@ def get_gmail_service() -> Any:
  
     return build('gmail', 'v1', credentials=creds)
 
-def send_reset_email(sender: str, to: str, reset_link: str):
+def send_email(sender: str, to: str, subject: str, body: str):
+
     try:
-   
         message = MIMEMultipart()
         message['to'] = to
         message['from'] = sender
-        message['subject'] = "Password Reset Request"
+        message['subject'] = subject
 
-        body = f"Click on the following link to reset your password: {reset_link}"
         msg_body = MIMEText(body, 'plain')
         message.attach(msg_body)
 
@@ -53,8 +52,9 @@ def send_reset_email(sender: str, to: str, reset_link: str):
         service = get_gmail_service()
         message_response = service.users().messages().send(userId="me", body={"raw": raw_message}).execute()
         print(f"Message sent successfully: {message_response}")
+        
     except Exception as error:
         print(f"Error sending email: {error}")
-        raise Exception("Failed to send password reset email")
+        raise Exception("Failed to send email")
 
 
