@@ -1,14 +1,13 @@
-from schemas import Users, signup_user, login_user, PasswordResetRequest, resetpassword
+from schemas import Users, signup_user, login_user, PasswordResetRequest
 import models , schemas
 from fastapi import APIRouter, HTTPException, Depends
 from database import get_db
 from sqlalchemy.orm import Session
-from authentication import bcrypt_context, create_token, user_access
+from authentication import bcrypt_context, create_token, create_reset_link, user_access
 from starlette import status
 from sqlalchemy import or_
 from send_mail import send_email
-from otp import generate_otp, verify_otp
-from models import Users
+
 
 
 router = APIRouter(prefix='/users_auth', tags=['users_auth'])
@@ -77,15 +76,12 @@ def login(user: login_user, session: Session = Depends(get_db)):
     ).first()
 
     if not db_user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, 
-                            detail="Invalid username/email or password.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invalid username/email or password.")
 
     if not bcrypt_context.verify(user.password, db_user.password):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, 
-                            detail="Invalid credentials")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
-    access_token = create_token(data={"sub": db_user.username,
-                                      "email": db_user.email})
+    access_token = create_token(data={"sub": db_user.username, "email": db_user.email})
 
     return {
         "access token": access_token,
@@ -97,55 +93,52 @@ def login(user: login_user, session: Session = Depends(get_db)):
 
 @router.post("/request-password-reset/")
 async def request_password_reset(data: PasswordResetRequest,
-                                 session: Session = Depends(get_db),
-                                 current_user: Users = Depends(user_access)):
+                                session: Session = Depends(get_db),
+                                current_user: Users = Depends(user_access)):
+    
 
     if current_user.role != "admin" and current_user.email != data.email:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="You do not have permission to reset another user's password.")
 
-    db_user = session.query(Users).filter(Users.email == data.email).first()
-    if not db_user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail="User not found.")
 
-    otp = generate_otp(data.email)
-    message = f"Your OTP for password reset is: {otp}. It will expire in 5 minutes."
-    send_email("no-reply@example.com", data.email, "Password Reset OTP", message)
+    db_user = session.query(models.Users).filter(models.Users.email == data.email).first()
+    
+    email = data.email
+    token = create_token(data={"sub": db_user.username, "email":db_user.email})
 
-    return {"message": "Password reset OTP sent successfully."}
+    message = f"""Password reset email: {token}, Please use this token to reset your password."""
+    send_email("syedaghazalzehra89.com",email,"Password Reset Request", message)
+
+    return {"message": "password reset mail sent successfully."}
 
 async def reset_password_page(token: str):
     return f"Your Password Reset Token: {token}\nUse this token in Postman to reset your password."
 
 @router.post("/reset_password/")
-def reset_password(user: resetpassword,  
+def reset_password(user: schemas.reset_password,
+                   data: PasswordResetRequest,
                    session: Session = Depends(get_db), 
                    current_user: Users = Depends(user_access)):
     
-    if current_user.role != "admin" and current_user.email != user.email:
+    if current_user.role != "admin" and current_user.email != data.email:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="You do not have permission to reset another user's password.")
-
-    if not verify_otp(user.email, user.otp):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                             detail="Invalid or expired OTP.")
-
-    users = session.query(Users).filter(Users.email == user.email).first()
+    
+    existing_user = session.query(models.Users).filter(models.Users.email == user.email).first()
 
     try:
         if not isinstance(user.new_password, str):
             raise HTTPException(status_code=400, detail="Password must be a string")
         hashed_password = bcrypt_context.hash(user.new_password)
 
-    except TypeError:
+    except TypeError as e:
         raise HTTPException(status_code=400, detail="Invalid password format")
 
-    users.password = hashed_password
+    existing_user.password = hashed_password
     session.commit()
 
     return {"message": "Password reset successfully."}
-
 
 @router.delete("/deleteusers/{user_id}")
 def deleteuser(user_id:int,

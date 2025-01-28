@@ -1,5 +1,4 @@
-from typing import Optional
-from fastapi import APIRouter, HTTPException, Depends, Path, Query, Request
+from fastapi import APIRouter, HTTPException, Depends, Request
 from sqlalchemy.orm import Session
 from database import get_db
 import models, schemas
@@ -7,77 +6,90 @@ from schemas import SaleSchema, filter_products
 from starlette import status
 from send_mail import send_email
 from datetime import datetime
+from sqlalchemy import func
 
 
-router = APIRouter(prefix='/trans_mngmnt', tags=['auth'])
+router = APIRouter(prefix='/inventory', tags=['inventory'])
 
 
-@router.post("/productsale/")
-def sale(stock: schemas.SaleSchema,
-               session: Session=Depends(get_db)):
-    product = session.query(models.PIMS).filter(models.PIMS.name == stock.name).first()
-    
-    threshold = 60
-    email = stock.email
-
-    message = f"""Subject: 
-
-Hello,
-
-This is an automated notification to inform you that the stock for {product.name} has dropped below the set threshold.
-
-Remaining Stock: {product.stock} units
-Threshold: {threshold} units
-
-Please review the stock levels and take necessary action to restock as needed to avoid running out of inventory.
-
-Thank you.
-
-Best regards,"""
-    if product.stock < threshold or product.stock == 0:
-        send_email("syedaghazalzehra89@gmail.com",email,f"Low Stock Alert: {product.name}", message)
+@router.post("/product/sale/")
+def sale(stock: schemas.SaleSchema, session: Session = Depends(get_db)):
+   
+    product = session.query(models.PIMS).filter(
+        func.lower(models.PIMS.name) == func.lower(stock.name)
+    ).first()
 
     if not product:
-        
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No product found.")
-     
-    if product.stock == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found.")
 
-        product.is_sold= True
+    if product.stock == 0:
+        product.is_sold = True
         session.commit()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Product has been sold.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Product is sold out.")
     
     if product.stock < stock.stock:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Not enough stock")
-    
-    if product.stock - stock.stock < 0:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="We are sorry stock is not enough.")
-    
-    product.stock -=stock.stock
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Not enough stock available.")
+
+    threshold = 60
+    if product.stock < threshold:
+        low_stock_message = f"""
+        Subject: Low Stock Alert
+
+        Hello,
+
+        This is an automated notification to inform you that the stock for {product.name} has dropped below the set threshold.
+
+        Remaining Stock: {product.stock} units
+        Threshold: {threshold} units
+
+        Please review the stock levels and take necessary action to restock as needed.
+
+        Thank you.
+
+        Best regards,
+        Inventory Team
+        """
+        send_email(
+            "syedaghazalzehra89@gmail.com",
+            stock.email,
+            f"Low Stock Alert: {product.name}",
+            low_stock_message
+        )
+
+    product.stock -= stock.stock
+    if product.stock == 0:
+        product.is_sold = True 
+
     session.commit()
-    email = stock.email
 
-    message = f"""
-Hello,
+    sale_confirmation_message = f"""
+    Subject: Sale Confirmation
 
-We are pleased to inform you that a sale has been successfully processed for the product "{product.name}".
+    Hello,
 
-Details of the sale:
-Product Name: {product.name}
-Quantity Purchased: {stock.stock} units
-Price: {product.price * stock.stock} rupees
-Sale Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+    We are pleased to inform you that a sale has been successfully processed for the product "{product.name}".
 
-Thank you for choosing our service.
+    Details of the sale:
+    Product Name: {product.name}
+    Quantity Purchased: {stock.stock} units
+    Total Price: {product.price * stock.stock} rupees
+    Sale Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
-Best regards,
-Your Company Name
-Sales Team
-"""
+    Thank you for choosing our service.
 
-    send_email("syedaghazalzehra89@gmail.com",email,"Sale Confirmation", message)
+    Best regards,
+    Your Company Name
+    Sales Team
+    """
+    send_email(
+        "syedaghazalzehra89@gmail.com",
+        stock.email,
+        "Sale Confirmation",
+        sale_confirmation_message
+    )
 
-    return {"message": f"Thankyou for your purchase you'll recieve a sale confirmation."}
+    return {"message": "Thank you for your purchase! You'll receive a sale confirmation email shortly."}
+
 
     
 @router.post("/search/products/")
@@ -135,9 +147,9 @@ def get_products(
     if search_params.get("max_price"):
         query = query.filter(models.PIMS.price <= search_params["max_price"])
     if search_params.get("min_stock"):
-        query = query.filter(models.PIMS.price >= search_params["min_stock"])
+        query = query.filter(models.PIMS.stock >= search_params["min_stock"])
     if search_params.get("max_stock"):
-        query = query.filter(models.PIMS.price <= search_params["max_stock"])
+        query = query.filter(models.PIMS.stock <= search_params["max_stock"])
 
     products = query.all()
 

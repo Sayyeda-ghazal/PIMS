@@ -2,11 +2,16 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional
 from enum import Enum
 
+class Roles(str, Enum):
+    user = "user"
+    admin = "admin"
+
 class Users(BaseModel):
 
     username : str
     password : str
     email : EmailStr
+    role: Roles = "user"
 
 
 class signup_user(BaseModel):
@@ -14,13 +19,14 @@ class signup_user(BaseModel):
     username : str
     password : str
     email : EmailStr
+    role: str = "user"
 
 
 class login_user(BaseModel):
 
-    username : str
+    username : Optional[str] = None
     password : str
-    email : EmailStr
+    email : Optional[EmailStr] = None
 
 
 class pims(BaseModel):
@@ -32,13 +38,14 @@ class pims(BaseModel):
     image_url :  Optional[str] = None
     created_at :  Optional[str] = None
     updated_at : Optional[str] = None
-    is_sold: bool
+    is_sold: bool = False
+    owner_id : Optional[int] = None
     class Config:
         form_attribute = True
 
 
-class reset_password(BaseModel):
-    token: str
+class resetpassword(BaseModel):
+    otp: str
     email: EmailStr
     new_password: str
 
@@ -60,9 +67,15 @@ class filter_products(BaseModel):
     min_stock: Optional[int] 
     max_stock: Optional[int] 
 
-class StockStatusEnum(Enum):
-    available = "Available"
-    sold = "Sold"
+
+
+class OTPRequest(BaseModel):
+    email: EmailStr
+
+class OTPVerification(BaseModel):
+    email: EmailStr
+    otp: str
+
 
 
 

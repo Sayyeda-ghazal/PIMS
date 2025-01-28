@@ -8,9 +8,9 @@ from datetime import datetime
 router = APIRouter()
 
 @router.get("/export_inventory/")
-def export_inventory(db: Session = Depends(get_db)):
+def export_inventory(session: Session = Depends(get_db)):
     
-    inventory_items = db.query(models.PIMS).all()
+    inventory_items = session.query(models.PIMS).all()
 
     file_name = f"inventory_export_{datetime.now().strftime('%Y-%m-%d')}.csv"
 
@@ -20,8 +20,7 @@ def export_inventory(db: Session = Depends(get_db)):
         writer.writerow([
             "ID", "Name", "Description", "Price", "Stock", "Category", "Image URL", "Created At", "Updated At", "is_sold"
         ])
-        
-        # Write the inventory data
+
         for item in inventory_items:
             writer.writerow([
                 item.id, item.name, item.description, item.price, item.stock,

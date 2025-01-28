@@ -1,14 +1,24 @@
 from passlib.context import CryptContext
 from datetime import timedelta, datetime
 from jose import jwt, JWTError
-import os, models, secrets
+import os, models, time
 from starlette import status
 from fastapi.security import OAuth2PasswordBearer
 from fastapi import Depends, HTTPException
 from database import get_db
 from sqlalchemy.orm import Session
 from itsdangerous import URLSafeTimedSerializer
+from dotenv import load_dotenv
+import sendlk
+import os
 
+# Load the .env file
+load_dotenv(".env")
+
+SENDLK_TOKEN = os.environ.get("SENDLK_TOKEN")
+SECRET = os.environ.get("SECRET")
+
+sendlk.initialize(SENDLK_TOKEN, SECRET)
 
 reset_tokens = {}
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
@@ -24,29 +34,37 @@ def hash_password(password: str) -> str:
 
 def create_token(data: dict):
     
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode = data.copy()
-    to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    payload = {
+        "sub": data["sub"],  
+        "email": data["email"], 
+        "iat": int(time.time()),  
+        "exp": datetime.utcnow() + timedelta(hours=1)  
+    }
+    
+    token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    return token
 
 def user_access(token:str = Depends(outh2_bearer), session: Session=Depends(get_db)):
+
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
     try:
 
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username = payload.get("sub")
 
         if username is None:
-             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail="Invalid authentication credentials")
-        
-        user = session.query(models.Users).filter(models.Users.username == username).first()
-        if user is None:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail="User not found")
-        return user
+             raise credentials_exception
 
     except JWTError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail="Invalid token")
-
-def create_reset_link(token: str) -> str:
-    base_url = "http://127.0.0.1:8000/reset-password"  
-    return f"{base_url}?token={token}"
-
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Permission denied to perform this operation on the selected account.") 
+    
+    user = session.query(models.Users).filter(models.Users.username == username).first()
+    if user is None:
+        raise credentials_exception
+    return user
