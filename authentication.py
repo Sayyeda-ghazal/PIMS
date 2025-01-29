@@ -8,19 +8,7 @@ from fastapi import Depends, HTTPException
 from database import get_db
 from sqlalchemy.orm import Session
 from itsdangerous import URLSafeTimedSerializer
-from dotenv import load_dotenv
-import sendlk
-import os
 
-# Load the .env file
-load_dotenv(".env")
-
-SENDLK_TOKEN = os.environ.get("SENDLK_TOKEN")
-SECRET = os.environ.get("SECRET")
-
-sendlk.initialize(SENDLK_TOKEN, SECRET)
-
-reset_tokens = {}
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 ALGORITHM = os.getenv("ALGORITHM")
 SECRET_KEY = os.getenv("SECRET_KEY")
