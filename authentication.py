@@ -17,9 +17,6 @@ DEBUG_MODE = os.getenv("DEBUG", "False") == "True"
 outh2_bearer = OAuth2PasswordBearer(tokenUrl='auth/token')
 bcrypt_context = CryptContext(schemes=['bcrypt'], deprecated = 'auto')
 
-def hash_password(password: str) -> str:
-    return bcrypt_context.hash(password)
-
 def create_token(data: dict):
     
     payload = {
